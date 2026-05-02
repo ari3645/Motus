@@ -1,44 +1,60 @@
 # -*- coding: utf-8 -*-
 import random
 from utils import charger_mots, mot_en_liste, comparer_mots
+from api_utils import fetch_random_word, validate_word_online, get_definition
 
 class MotusEngine:
-    def __init__(self, dictionnaire_path, tentatives_max=6):
-        # On charge tous les mots pour la validation et le choix aléatoire
-        self.dictionnaire = set(charger_mots(dictionnaire_path))
-        if not self.dictionnaire:
-            raise ValueError("Erreur de dictionnaire : aucun mot chargé.")
-        
-        # Choix du mot secret parmi les mots chargés
-        self.secret = random.choice(list(self.dictionnaire))
-        self.taille = len(self.secret)
-        self.secret_liste = mot_en_liste(self.secret)
-        
+    def __init__(self, dictionnaire_path=None, longueur=7, tentatives_max=7, use_api=False):
+        self.use_api = use_api
+        self.taille = longueur
         self.tentatives_max = tentatives_max
         self.tentatives_faites = 0
         self.historique = []
         self.gagne = False
         self.termine = False
+        self.dictionnaire_local = set()
+        self.definition = None
+
+        if use_api:
+            # Mode API
+            self.secret = fetch_random_word(longueur)
+            if not self.secret:
+                # Fallback local si l'API échoue au démarrage
+                print("API indisponible, passage au mode local...")
+                self.use_api = False
         
+        if not use_api or not self.secret:
+            # Mode Local
+            if dictionnaire_path:
+                self.dictionnaire_local = set(charger_mots(dictionnaire_path))
+            
+            if not self.dictionnaire_local:
+                raise ValueError("Erreur : Aucun dictionnaire disponible.")
+            
+            self.secret = random.choice(list(self.dictionnaire_local))
+            self.taille = len(self.secret)
+        
+        self.secret_liste = mot_en_liste(self.secret)
         self.indices_decouverts = ["_"] * self.taille
         self.indices_decouverts[0] = self.secret[0].upper()
 
     def proposer_mot(self, proposition):
         proposition = proposition.upper()
         
-        # 1. Vérification de la taille
         if len(proposition) != self.taille:
             return "WRONG_SIZE"
             
-        # 2. Vérification de l'existence dans le dictionnaire
-        if proposition not in self.dictionnaire:
-            return "NOT_IN_DICT"
+        # Validation du mot
+        if self.use_api:
+            if not validate_word_online(proposition):
+                return "NOT_IN_DICT"
+        else:
+            if proposition not in self.dictionnaire_local:
+                return "NOT_IN_DICT"
             
-        # 3. Vérification si le jeu est fini
         if self.termine:
             return None
         
-        # Logique de jeu normale
         self.tentatives_faites += 1
         prop_liste = mot_en_liste(proposition)
         resultat = comparer_mots(prop_liste, self.secret_liste)
@@ -51,8 +67,12 @@ class MotusEngine:
         if proposition == self.secret:
             self.gagne = True
             self.termine = True
+            if self.use_api:
+                self.definition = get_definition(self.secret)
         elif self.tentatives_faites >= self.tentatives_max:
             self.termine = True
+            if self.use_api:
+                self.definition = get_definition(self.secret)
             
         return resultat
 
@@ -63,5 +83,6 @@ class MotusEngine:
             "indices_decouverts": self.indices_decouverts,
             "gagne": self.gagne,
             "termine": self.termine,
-            "secret": self.secret if self.termine else None
+            "secret": self.secret if self.termine else None,
+            "definition": self.definition if self.termine else None
         }
