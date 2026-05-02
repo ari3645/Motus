@@ -40,12 +40,8 @@ class MotusGUI:
         temps_map = {"Facile": 90, "Moyen": 60, "Difficile": 30}
         self.temps_restant = temps_map.get(self.difficulte, 60)
             
-        chemin_dico = None
-        if not self.use_api:
-            chemin_dico = self.trouver_dictionnaire(self.longueur)
-            if not chemin_dico:
-                messagebox.showerror("Erreur", "Dictionnaire local introuvable.")
-                self.root.destroy(); return
+        # On cherche toujours le dictionnaire local pour avoir une double sécurité
+        chemin_dico = self.trouver_dictionnaire(self.longueur)
 
         try:
             self.jeu = MotusEngine(dictionnaire_path=chemin_dico, longueur=self.longueur, 

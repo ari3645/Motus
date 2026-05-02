@@ -16,42 +16,41 @@ class MotusEngine:
         self.definition = None
         self.mode_difficulte = mode_difficulte
 
+        if dictionnaire_path:
+            self.dictionnaire_local = set(charger_mots(dictionnaire_path))
+
         if use_api:
             self.secret = fetch_random_word(longueur)
             if not self.secret:
                 self.use_api = False
         
         if not use_api or not self.secret:
-            if dictionnaire_path:
-                self.dictionnaire_local = set(charger_mots(dictionnaire_path))
             if not self.dictionnaire_local:
-                raise ValueError("Erreur : Aucun dictionnaire disponible.")
+                raise ValueError("Aucun dictionnaire disponible.")
             self.secret = random.choice(list(self.dictionnaire_local))
             self.taille = len(self.secret)
         
         self.secret_liste = mot_en_liste(self.secret)
-        
-        # Initialisation des indices selon la difficulté
         self.indices_decouverts = ["_"] * self.taille
-        
         if mode_difficulte == "Facile":
             self.indices_decouverts[0] = self.secret[0].upper()
             self.indices_decouverts[-1] = self.secret[-1].upper()
         elif mode_difficulte == "Moyen":
             self.indices_decouverts[0] = self.secret[0].upper()
-        # "Difficile" -> reste avec ["_", "_", ...]
 
     def proposer_mot(self, proposition):
         proposition = proposition.upper()
         if len(proposition) != self.taille:
             return "WRONG_SIZE"
             
-        if self.use_api:
-            if not validate_word_online(proposition):
-                return "NOT_IN_DICT"
-        else:
-            if proposition not in self.dictionnaire_local:
-                return "NOT_IN_DICT"
+        # Validation : On accepte si c'est dans le dico local OU si l'API le valide
+        est_valide = (proposition in self.dictionnaire_local)
+        
+        if not est_valide and self.use_api:
+            est_valide = validate_word_online(proposition)
+        
+        if not est_valide:
+            return "NOT_IN_DICT"
             
         if self.termine:
             return None
